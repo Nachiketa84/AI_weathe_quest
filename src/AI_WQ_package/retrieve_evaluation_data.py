@@ -194,3 +194,37 @@ def retrieve_all_period_fcdates(fc_init_date,password):
 
     return all_fc_init_dates # return all the fc init dates
 
+def retrieve_20yr_climatology(date, variable, password, local_destination=None):
+    """
+    Retrieve the full 20-year climatology NetCDF file for the given date and variable.
+    
+    Parameters
+    ----------
+    date : str
+        Date string in 'YYYYMMDD' format.
+    variable : str
+        Variable short name: 'tas', 'pr', or 'mslp'.
+    password : str
+        User password for authentication.
+    local_destination : str, optional
+        Local path to save the downloaded NetCDF file. If None, saves in current directory.
+    
+    Returns
+    -------
+    xarray.Dataset
+        Climatology dataset.
+    """
+    from AI_WQ_package import data_access_utils  # adjust if import path differs
+    import xarray as xr
+
+    # Construct the climatology filename path pattern
+    filename = f"{variable}_20yrCLIM_WEEKLYMEAN_{date}.nc"
+    file_path = f"/climatologies/2025/{filename}"  # adjust year folder if dynamic
+
+    # Download file using existing internal utility
+    local_file = data_access_utils.download_file_from_api(file_path, password, local_destination=local_destination)
+
+    # Load and return as xarray.Dataset
+    clim_ds = xr.open_dataset(local_file)
+    return clim_ds
+
