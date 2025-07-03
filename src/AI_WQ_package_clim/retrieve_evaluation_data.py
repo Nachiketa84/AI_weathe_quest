@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
-from AI_WQ_package import check_fc_submission
+from AI_WQ_package_clim import check_fc_submission
 import ftplib
 import os
 
@@ -194,6 +194,9 @@ def retrieve_all_period_fcdates(fc_init_date,password):
 
     return all_fc_init_dates # return all the fc init dates
 
+#########My addition##############
+##################################
+
 def retrieve_20yr_climatology(date, variable, password, local_destination=None):
     """
     Retrieve the full 20-year climatology NetCDF file for the given date and variable.
@@ -214,17 +217,46 @@ def retrieve_20yr_climatology(date, variable, password, local_destination=None):
     xarray.Dataset
         Climatology dataset.
     """
-    from AI_WQ_package import data_access_utils  # adjust if import path differs
+    import ftplib
     import xarray as xr
+    from datetime import datetime
 
-    # Construct the climatology filename path pattern
-    filename = f"{variable}_20yrCLIM_WEEKLYMEAN_{date}.nc"
-    file_path = f"/climatologies/2025/{filename}"  # adjust year folder if dynamic
+    # Validate variable
+    check_fc_submission.check_variable_in_list(variable, ['tas', 'mslp', 'pr'])
 
-    # Download file using existing internal utility
-    local_file = data_access_utils.download_file_from_api(file_path, password, local_destination=local_destination)
+    # Convert date string to date object
+    date_obj = datetime.strptime(date, '%Y%m%d')
+    str_year = str(date_obj.year)
 
-    # Load and return as xarray.Dataset
-    clim_ds = xr.open_dataset(local_file)
+    # Create local filename
+    if local_destination is None:
+        local_filename = f"{variable}_20yrCLIM_WEEKLYMEAN_{date}.nc"
+    else:
+        local_filename = f"{local_destination}/{variable}_20yrCLIM_WEEKLYMEAN_{date}.nc"
+
+    # FTP download
+    session = ftplib.FTP('ftp.ecmwf.int', 'ai_weather_quest', password)
+
+    if variable in ['tas', 'mslp']:
+        remote_path = f"/climatologies/{str_year}/{variable}_20yrCLIM_WEEKLYMEAN_{date}.nc"
+    elif variable == 'pr':
+        remote_path = f"/climatologies/{str_year}/{variable}_20yrCLIM_WEEKLYSUM_{date}.nc"
+
+    with open(local_filename, 'wb') as f:
+        session.retrbinary(f"RETR {remote_path}", f.write)
+
+    print(f"File '{remote_path}' has been downloaded successfully.")
+
+    session.quit()
+
+    # Open as xarray.Dataset
+    clim_ds = xr.open_dataset(local_filename).squeeze()
+
+    # Adjust coordinate names if needed
+    try:
+        clim_ds = change_lat_long_coord_names(clim_ds)
+    except:
+        pass
+
     return clim_ds
 
